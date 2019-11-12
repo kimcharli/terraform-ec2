@@ -5,4 +5,20 @@
 
 terraform init
 
+terraform plan
+
+terraform apply
+
+terraform destroy
+
+
+
+=== access
+
+ssh ubuntu@18.237.87.148
+
+ssh -J ubuntu@18.237.87.148 ubuntu@10.0.1.229
+
+
+
 

@@ -95,7 +95,7 @@ resource "aws_route" "internet_access" {
 //////// SG
 resource "aws_security_group" "bastion" {
   name        = "bastion-${var.vpc_name}"
-  description = "For bastion traffic"
+  description = "Bastion ingress traffic"
   vpc_id = "${aws_vpc.default.id}"
 }
 
@@ -103,7 +103,7 @@ data "http" "ip" {
   url = "http://icanhazip.com"
 }
 
-resource "aws_security_group_rule" "ssh-client" {
+resource "aws_security_group_rule" "bastion-ssh" {
   type = "ingress"
   from_port = 22
   to_port = 22
@@ -112,6 +112,52 @@ resource "aws_security_group_rule" "ssh-client" {
   cidr_blocks = [ "${chomp(data.http.ip.body)}/32"]
 }
 
+resource "aws_security_group_rule" "bastion-vpc" {
+  type = "ingress"
+  from_port = 0
+  to_port = 0
+  protocol = "-1"
+  security_group_id = "${aws_security_group.bastion.id}"
+  cidr_blocks = ["${var.k8s_vpc_net}"]
+}
+
+resource "aws_security_group_rule" "bastion-vpc-egress" {
+  type = "egress"
+  from_port = 0
+  to_port = 0
+  protocol = "-1"
+  security_group_id = "${aws_security_group.bastion.id}"
+  cidr_blocks = ["${var.k8s_vpc_net}"]
+}
+
+
+
+resource "aws_security_group" "k8s-master" {
+  name        = "master-${var.vpc_name}"
+  description = "Master ingress traffic"
+  vpc_id = "${aws_vpc.default.id}"
+}
+
+resource "aws_security_group_rule" "k8s-vpc" {
+  type = "ingress"
+  from_port = 0
+  to_port = 0
+  protocol = "-1"
+  security_group_id = "${aws_security_group.k8s-master.id}"
+  cidr_blocks = ["${var.k8s_vpc_net}"]
+}
+
+resource "aws_security_group_rule" "k8s-master-egress" {
+  type = "egress"
+  from_port = 0
+  to_port = 0
+  protocol = "-1"
+  security_group_id = "${aws_security_group.k8s-master.id}"
+  cidr_blocks = ["${var.k8s_vpc_net}"]
+}
+
+
+
 //////// EC2
 resource "aws_instance" "bastion" {
   ami = "${data.aws_ami.default.id}"
@@ -119,6 +165,7 @@ resource "aws_instance" "bastion" {
   key_name = "${var.key_name}"
   subnet_id = "${aws_subnet.default.id}"
   vpc_security_group_ids = ["${aws_security_group.bastion.id}"]
+  associate_public_ip_address = "true"
 
   tags {
     Name = "k8s-bastion-${var.vpc_name}"
@@ -127,28 +174,32 @@ resource "aws_instance" "bastion" {
 
 
 
-//resource "aws_instance" "k8s-master" {
-//  ami = data.aws_ami.default.id
-//  instance_type = "${var.k8s_instance_type}"
-//  key_name = "${var.key_name}"
-//
-//  tags {
-//    Name = "k8s-master-${var.vpc_name}"
-//  }
-//
-//}
-//
-//
-//resource "aws_instance" "k8s-node" {
-//  count = 2
-//  ami = data.aws_ami.default.id
-//  instance_type = "${var.k8s_instance_type}"
-//  key_name = "${var.key_name}"
-//
-//  tags {
-//    Name = "k8s-node-${count.index}-${var.vpc_name}"
-//  }
-//
-//}
-//
-//
+resource "aws_instance" "k8s-master" {
+  ami = "${data.aws_ami.default.id}"
+  instance_type = "${var.k8s_instance_type}"
+  key_name = "${var.key_name}"
+  subnet_id = "${aws_subnet.default.id}"
+  vpc_security_group_ids = ["${aws_security_group.k8s-master.id}"]
+
+  tags {
+    Name = "k8s-master-${var.vpc_name}"
+  }
+
+}
+
+
+resource "aws_instance" "k8s-node" {
+  count = 2
+  ami = "${data.aws_ami.default.id}"
+  instance_type = "${var.k8s_instance_type}"
+  key_name = "${var.key_name}"
+  subnet_id = "${aws_subnet.default.id}"
+  vpc_security_group_ids = ["${aws_security_group.k8s-master.id}"]
+
+  tags {
+    Name = "k8s-node-${count.index}-${var.vpc_name}"
+  }
+
+}
+
+
