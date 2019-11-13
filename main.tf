@@ -1,6 +1,7 @@
 ////////
 provider "aws" {
-  region = "${var.aws_region}"
+//  region = "${var.aws_region}"
+  region = var.aws_region
 }
 
 //////// AMI
@@ -57,18 +58,18 @@ data "aws_ami" "default" {
 
 //////// VPC
 resource "aws_vpc" "default" {
-  cidr_block       = "${var.k8s_vpc_net}"
+  cidr_block       = var.k8s_vpc_net
   enable_dns_hostnames = true
 
-  tags {
+  tags = {
     Name = "vpc-${var.vpc_name}"
   }
 }
 
 resource "aws_internet_gateway" "default" {
-  vpc_id     = "${aws_vpc.default.id}"
+  vpc_id     = aws_vpc.default.id
 
-  tags {
+  tags = {
     Name = "igw-${var.vpc_name}"
   }
 }
@@ -76,23 +77,23 @@ resource "aws_internet_gateway" "default" {
 data "aws_availability_zones" "azs" {}
 
 resource "aws_subnet" "public" {
-  vpc_id     = "${aws_vpc.default.id}"
-  cidr_block = "${var.k8s_vpc_subnet_public}"
-  availability_zone = "${data.aws_availability_zones.azs.names[0]}"
+  vpc_id     = aws_vpc.default.id
+  cidr_block = var.k8s_vpc_subnet_public
+  availability_zone = data.aws_availability_zones.azs.names[0]
   map_public_ip_on_launch = true
 
-  tags {
+  tags = {
     Name = "public-subnet-${var.vpc_name}"
   }
 }
 
 resource "aws_subnet" "private" {
-  vpc_id     = "${aws_vpc.default.id}"
-  cidr_block = "${var.k8s_vpc_subnet_private}"
-  availability_zone = "${data.aws_availability_zones.azs.names[0]}"
+  vpc_id     = aws_vpc.default.id
+  cidr_block = var.k8s_vpc_subnet_private
+  availability_zone = data.aws_availability_zones.azs.names[0]
 //  map_public_ip_on_launch = true
 
-  tags {
+  tags = {
     Name = "private-subnet-${var.vpc_name}"
   }
 }
@@ -103,16 +104,16 @@ resource "aws_eip" "nat" {
 }
 
 resource "aws_nat_gateway" "default" {
-  allocation_id = "${aws_eip.nat.id}"
-  subnet_id = "${aws_subnet.public.id}"
+  allocation_id = aws_eip.nat.id
+  subnet_id = aws_subnet.public.id
 
-  tags {
+  tags = {
     Name = "nat-${var.vpc_name}"
   }
 }
 
 resource "aws_route_table" "public" {
-  vpc_id = "${aws_vpc.default.id}"
+  vpc_id = aws_vpc.default.id
 
 //  route {
 //    cidr_block = "${var.k8s_vpc_net}"
@@ -120,17 +121,17 @@ resource "aws_route_table" "public" {
 
   route {
     cidr_block = "0.0.0.0/0"
-    gateway_id = "${aws_internet_gateway.default.id}"
+    gateway_id = aws_internet_gateway.default.id
   }
 
-  tags {
+  tags = {
     Name = "public-rt"
   }
 
 }
 
 resource "aws_route_table" "private" {
-  vpc_id = "${aws_vpc.default.id}"
+  vpc_id = aws_vpc.default.id
 
 //  route {
 //    cidr_block = "${var.k8s_vpc_net}"
@@ -138,10 +139,10 @@ resource "aws_route_table" "private" {
 
   route {
     cidr_block = "0.0.0.0/0"
-    nat_gateway_id = "${aws_nat_gateway.default.id}"
+    nat_gateway_id = aws_nat_gateway.default.id
   }
 
-  tags {
+  tags = {
     Name = "private-rt"
   }
 
@@ -157,20 +158,20 @@ resource "aws_route_table" "private" {
 //}
 
 resource "aws_route_table_association" "public" {
-  route_table_id = "${aws_route_table.public.id}"
-  subnet_id = "${aws_subnet.public.id}"
+  route_table_id = aws_route_table.public.id
+  subnet_id = aws_subnet.public.id
 }
 
 resource "aws_route_table_association" "private" {
-  route_table_id = "${aws_route_table.private.id}"
-  subnet_id = "${aws_subnet.private.id}"
+  route_table_id = aws_route_table.private.id
+  subnet_id = aws_subnet.private.id
 }
 
 //////// SG
 resource "aws_security_group" "bastion" {
   name        = "bastion-${var.vpc_name}"
   description = "Bastion ingress traffic"
-  vpc_id = "${aws_vpc.default.id}"
+  vpc_id = aws_vpc.default.id
 }
 
 data "http" "ip" {
@@ -241,7 +242,7 @@ resource "aws_instance" "bastion" {
   vpc_security_group_ids = ["${aws_security_group.bastion.id}"]
   associate_public_ip_address = true
 
-  tags {
+  tags = {
     Name = "k8s-bastion-${var.vpc_name}"
   }
 }
@@ -249,13 +250,17 @@ resource "aws_instance" "bastion" {
 
 
 resource "aws_instance" "k8s-master" {
-  ami = "${data.aws_ami.default.id}"
-  instance_type = "${var.k8s_instance_type}"
-  key_name = "${var.key_name}"
-  subnet_id = "${aws_subnet.private.id}"
-  vpc_security_group_ids = ["${aws_security_group.k8s-master.id}"]
+  count = 1
+  ami = data.aws_ami.default.id
+  instance_type = var.k8s_instance_type
+  key_name = var.key_name
+  user_data = file("user_data.master.ubuntu.sh")
+  subnet_id = aws_subnet.private.id
+//  private_ip = "${var.masters_ips[count.index]}"
+  private_ip = var.node_ips.masters[count.index]
+  vpc_security_group_ids = [aws_security_group.k8s-master.id]
 
-  tags {
+  tags = {
     Name = "k8s-master-${var.vpc_name}"
   }
 
@@ -264,13 +269,16 @@ resource "aws_instance" "k8s-master" {
 
 resource "aws_instance" "k8s-node" {
   count = 2
-  ami = "${data.aws_ami.default.id}"
-  instance_type = "${var.k8s_instance_type}"
-  key_name = "${var.key_name}"
-  subnet_id = "${aws_subnet.private.id}"
-  vpc_security_group_ids = ["${aws_security_group.k8s-master.id}"]
+  ami = data.aws_ami.default.id
+  instance_type = var.k8s_instance_type
+  key_name = var.key_name
+  user_data = file("user_data.ubuntu.sh")
+  subnet_id = aws_subnet.private.id
+//  private_ip = "${var.nodes_ips[count.index]}"
+  private_ip = var.node_ips.nodes[count.index]
+  vpc_security_group_ids = [aws_security_group.k8s-master.id]
 
-  tags {
+  tags = {
     Name = "k8s-node-${count.index}-${var.vpc_name}"
   }
 

@@ -45,3 +45,15 @@ EOF
 apt-get update
 apt-get install -y kubelet kubeadm kubectl
 apt-mark hold kubelet kubeadm kubectl
+
+kubeadm init --pod-network-cidr=192.168.0.0/16 | tee /var/tmp/k8s-kubeadm.log
+
+su - contrail -c "
+mkdir -p ~contrail/.kube ;
+sudo cp /etc/kubernetes/admin.conf ~contrail/.kube/config ;
+sudo chown $(id -u):$(id -g) ~contrail/.kube/config
+"
+
+
+
+

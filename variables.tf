@@ -21,6 +21,26 @@ variable "k8s_vpc_subnet_private" {
   default = "10.0.20.0/24"
 }
 
+//variable "masters_ips" {
+//  type = list(string)
+//  default = [ "10.0.20.11", "10.0.20.12", "10.0.20.13"]
+//}
+//
+//variable "nodes_ips" {
+//  type = list(string)
+//  default = [ "10.0.20.21", "10.0.20.22", "10.0.20.23"]
+//}
+
+variable "node_ips" {
+  type = object({
+    masters = list(string)
+    nodes = list(string)
+  })
+  default = {
+    masters = [ "10.0.20.11", "10.0.20.12", "10.0.20.13"]
+    nodes = [ "10.0.20.21", "10.0.20.22", "10.0.20.23"]
+  }
+}
 
 variable "k8s_ami_name" {
   default = "ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-arm64-server-20191021*"
