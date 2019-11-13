@@ -20,5 +20,14 @@ ssh ubuntu@18.237.87.148
 ssh -J ubuntu@18.237.87.148 ubuntu@10.0.1.229
 
 
+=== TODO
+
+implement user-data
+
+implement LB as ingress
+
+kubectl proxy
+
+
 
 

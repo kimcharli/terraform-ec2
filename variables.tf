@@ -13,9 +13,14 @@ variable "k8s_vpc_net" {
   default = "10.0.0.0/16"
 }
 
-variable "k8s_vpc_subnet" {
-  default = "10.0.1.0/24"
+variable "k8s_vpc_subnet_public" {
+  default = "10.0.10.0/24"
 }
+
+variable "k8s_vpc_subnet_private" {
+  default = "10.0.20.0/24"
+}
+
 
 variable "k8s_ami_name" {
   default = "ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-arm64-server-20191021*"
