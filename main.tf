@@ -6,18 +6,18 @@ terraform {
 
 ////////
 provider "aws" {
-//  region = "${var.aws_region}"
   region = var.aws_region
 }
+
 
 //////// AMI
 data "aws_ami" "default" {
   most_recent = true
-  owners = ["099720109477"] # Canonical
+  owners = var.aws-ami[var.aws-ami-choice].owners
 
   filter {
       name   = "name"
-      values = ["ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-*"]
+      values = var.aws-ami[var.aws-ami-choice].name-filter
   }
 
   filter {
@@ -26,45 +26,10 @@ data "aws_ami" "default" {
   }
 }
 
-//data "aws_ami" "latest_ecs" {
-//  most_recent = true
-//  owners = ["591542846629"] # AWS
-//
-//  filter {
-//      name   = "name"
-//      values = ["*amazon-ecs-optimized"]
-//  }
-//
-//  filter {
-//      name   = "virtualization-type"
-//      values = ["hvm"]
-//  }
-//}
-
-//data "aws_ami" "centos" {
-//owners      = ["679593333241"]
-//most_recent = true
-//
-//  filter {
-//      name   = "name"
-//      values = ["CentOS Linux 7 x86_64 HVM EBS *"]
-//  }
-//
-//  filter {
-//      name   = "architecture"
-//      values = ["x86_64"]
-//  }
-//
-//  filter {
-//      name   = "root-device-type"
-//      values = ["ebs"]
-//  }
-//}
-
 
 //////// VPC
 resource "aws_vpc" "default" {
-  cidr_block       = var.k8s_vpc_net
+  cidr_block       = var.vpc_net
   enable_dns_hostnames = true
 
   tags = {
@@ -84,7 +49,7 @@ data "aws_availability_zones" "azs" {}
 
 resource "aws_subnet" "public" {
   vpc_id     = aws_vpc.default.id
-  cidr_block = var.k8s_vpc_subnet_public
+  cidr_block = var.vpc_subnet_public
   availability_zone = data.aws_availability_zones.azs.names[0]
   map_public_ip_on_launch = true
 
@@ -95,7 +60,7 @@ resource "aws_subnet" "public" {
 
 resource "aws_subnet" "private" {
   vpc_id     = aws_vpc.default.id
-  cidr_block = var.k8s_vpc_subnet_private
+  cidr_block = var.vpc_subnet_private
   availability_zone = data.aws_availability_zones.azs.names[0]
 //  map_public_ip_on_launch = true
 
@@ -199,7 +164,7 @@ resource "aws_security_group_rule" "bastion-vpc" {
   to_port = 0
   protocol = "-1"
   security_group_id = "${aws_security_group.bastion.id}"
-  cidr_blocks = ["${var.k8s_vpc_net}"]
+  cidr_blocks = ["${var.vpc_net}"]
 }
 
 resource "aws_security_group_rule" "bastion-vpc-egress" {
@@ -225,7 +190,7 @@ resource "aws_security_group_rule" "k8s-vpc" {
   to_port = 0
   protocol = "-1"
   security_group_id = "${aws_security_group.k8s-master.id}"
-  cidr_blocks = ["${var.k8s_vpc_net}"]
+  cidr_blocks = ["${var.vpc_net}"]
 }
 
 resource "aws_security_group_rule" "k8s-master-egress" {
@@ -256,14 +221,14 @@ resource "aws_instance" "bastion" {
 
 
 resource "aws_instance" "k8s-master" {
-  count = 1
+  count = var.instance-count
   ami = data.aws_ami.default.id
-  instance_type = var.k8s_instance_type
+  instance_type = var.instance_type
   key_name = var.key_name
   user_data = file("user_data.master.ubuntu.sh")
   subnet_id = aws_subnet.private.id
 //  private_ip = "${var.masters_ips[count.index]}"
-  private_ip = var.node_ips.masters[count.index]
+  private_ip = var.node_ips[count.index]
   vpc_security_group_ids = [aws_security_group.k8s-master.id]
 
   tags = {
@@ -272,22 +237,5 @@ resource "aws_instance" "k8s-master" {
 
 }
 
-
-resource "aws_instance" "k8s-node" {
-  count = 2
-  ami = data.aws_ami.default.id
-  instance_type = var.k8s_instance_type
-  key_name = var.key_name
-  user_data = file("user_data.ubuntu.sh")
-  subnet_id = aws_subnet.private.id
-//  private_ip = "${var.nodes_ips[count.index]}"
-  private_ip = var.node_ips.nodes[count.index]
-  vpc_security_group_ids = [aws_security_group.k8s-master.id]
-
-  tags = {
-    Name = "k8s-node-${count.index}-${var.vpc_name}"
-  }
-
-}
 
 

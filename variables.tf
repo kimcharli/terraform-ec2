@@ -2,22 +2,56 @@ terraform {
 }
 
 variable "aws_region" {
-  default = "us-west-2"
+  default = "us-east-2"
 }
 
+//// AMI
+variable "aws-ami-choice" {
+  default = "ubuntu"
+}
+
+variable "aws-ami" {
+  type = map(object({
+    owners = list(string)
+    name-filter = list(string)
+    user = string
+  }))
+
+  default = {
+    ubuntu = {
+      owners = ["099720109477"] # Canonical
+      name-filter = ["ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-amd64-server-*"]
+      user = "ubuntu"
+    }
+    centos = {
+      owners = ["679593333241"]
+      name-filter = ["CentOS Linux 7 x86_64 HVM EBS *"]
+      user = "centos"
+    }
+    amazon-ecs = {
+      owners = ["591542846629"] # AWS
+      name-filter = ["*amazon-ecs-optimized"]
+      user = "cloud_user"
+    }
+  }
+
+}
+
+
+//// VPC
 variable "vpc_name" {
-  default = "k8s-vpc1"
+  default = "kafka-vpc1"
 }
 
-variable "k8s_vpc_net" {
+variable "vpc_net" {
   default = "10.0.0.0/16"
 }
 
-variable "k8s_vpc_subnet_public" {
+variable "vpc_subnet_public" {
   default = "10.0.10.0/24"
 }
 
-variable "k8s_vpc_subnet_private" {
+variable "vpc_subnet_private" {
   default = "10.0.20.0/24"
 }
 
@@ -31,28 +65,20 @@ variable "k8s_vpc_subnet_private" {
 //  default = [ "10.0.20.21", "10.0.20.22", "10.0.20.23"]
 //}
 
-variable "node_ips" {
-  type = object({
-    masters = list(string)
-    nodes = list(string)
-  })
-  default = {
-    masters = [ "10.0.20.11", "10.0.20.12", "10.0.20.13"]
-    nodes = [ "10.0.20.21", "10.0.20.22", "10.0.20.23"]
-  }
-}
+//variable "node_ips" {
+//  type = object({
+//    masters = list(string)
+//    nodes = list(string)
+//  })
+//  default = {
+//    masters = [ "10.0.20.11", "10.0.20.12", "10.0.20.13"]
+//    nodes = [ "10.0.20.21", "10.0.20.22", "10.0.20.23"]
+//  }
+//}
 
-variable "k8s_ami_name" {
-  default = "ubuntu/images/hvm-ssd/ubuntu-xenial-16.04-arm64-server-20191021*"
-}
-
-variable "k8s_instance_type" {
+variable "instance_type" {
   description = "Flavor of image"
   default = "c4.xlarge"
-}
-
-variable "ec2_user" {
-  default = "ubuntu"
 }
 
 variable "key_name" {
@@ -60,4 +86,11 @@ variable "key_name" {
   default = "ckim-mbp"
 }
 
+variable "instance-count" {
+  default = 3
+}
 
+variable "node_ips" {
+  type = list(string)
+  default = [ "10.0.20.11", "10.0.20.12", "10.0.20.13"]
+}
